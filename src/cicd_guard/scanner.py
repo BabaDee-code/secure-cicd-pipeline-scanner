@@ -8,7 +8,11 @@ SECRET_PATTERNS = [
     re.compile(r"(?i)(api[_-]?key|secret|token)\s*[:=]\s*['\"]?[A-Za-z0-9_\-]{12,}"),
     re.compile(r"AKIA[0-9A-Z]{16}"),
 ]
-DANGEROUS_COMMANDS = ["curl | sh", "wget | sh", "chmod 777", "set +e"]
+DANGEROUS_COMMAND_PATTERNS = {
+    "remote script piped to shell": re.compile(r"\b(curl|wget)\b[^\n|]*\|\s*(bash|sh)\b", re.IGNORECASE),
+    "world-writable permissions": re.compile(r"\bchmod\s+777\b", re.IGNORECASE),
+    "error suppression": re.compile(r"\bset\s+\+e\b", re.IGNORECASE),
+}
 
 
 def scan_workflow(workflow: dict[str, Any], raw_text: str = "") -> list[dict[str, str]]:
@@ -38,10 +42,9 @@ def _scan_jobs(jobs: dict[str, Any]) -> list[dict[str, str]]:
             if uses and not _is_pinned_action(str(uses)):
                 findings.append(_finding("medium", f"Action is not pinned to a full commit SHA: {uses}", "Pin third-party actions to a trusted full-length commit SHA."))
             if isinstance(run, str):
-                lowered = run.lower()
-                for command in DANGEROUS_COMMANDS:
-                    if command in lowered:
-                        findings.append(_finding("high", f"Dangerous shell pattern found in job {job_name}: {command}", "Replace unsafe shell patterns with verified scripts and integrity checks."))
+                for label, pattern in DANGEROUS_COMMAND_PATTERNS.items():
+                    if pattern.search(run):
+                        findings.append(_finding("high", f"Dangerous shell pattern found in job {job_name}: {label}", "Replace unsafe shell patterns with verified scripts and integrity checks."))
     return findings
 
 
