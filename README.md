@@ -2,7 +2,7 @@
 
 ![CI](https://github.com/BabaDee-code/secure-cicd-pipeline-scanner/actions/workflows/ci.yml/badge.svg)
 
-A DevSecOps security scanner that reviews GitHub Actions workflows for excessive permissions, unpinned third-party actions, exposed secret patterns, weak artifact controls, and insecure CI/CD patterns. This project is designed as a safe, testable portfolio tool for software supply-chain security.
+A DevSecOps security scanner that reviews GitHub Actions workflows for excessive permissions, unpinned third-party actions, exposed secret patterns, dangerous shell execution, and pull-request trust-boundary failures. This project is designed as a safe, testable portfolio tool for software supply-chain security.
 
 ## What this project shows
 
@@ -11,7 +11,9 @@ A DevSecOps security scanner that reviews GitHub Actions workflows for excessive
 - Unpinned action detection
 - Secret-pattern detection in workflow files
 - Dangerous shell command pattern detection
-- Risk scoring and remediation recommendations
+- `pull_request_target` trust-boundary analysis
+- Direct PR metadata-to-shell interpolation detection
+- Severity-based findings with remediation recommendations
 - Unit tests and CI validation
 
 ## Repository structure
@@ -30,17 +32,19 @@ docs/security-model.md      CI/CD security model and control mapping
 python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\\Scripts\\activate
 pip install -r requirements-dev.txt
-pytest -q
-python -m cicd_guard.scan samples/workflows/insecure-workflow.yml
+PYTHONPATH=src pytest -q
+PYTHONPATH=src python -m cicd_guard.scan samples/workflows/insecure-workflow.yml
 ```
+
+On Windows PowerShell, set `$env:PYTHONPATH = "src"` before running the test or CLI commands.
 
 ## Example finding
 
 ```json
 {
-  "severity": "high",
-  "finding": "Workflow grants write-all permissions",
-  "recommendation": "Use least-privilege permissions at workflow or job level."
+  "severity": "critical",
+  "finding": "pull_request_target job review checks out untrusted pull request code",
+  "recommendation": "Do not execute pull request head code in pull_request_target. Use pull_request for untrusted code, or keep the privileged workflow on trusted base-repository code only."
 }
 ```
 
@@ -50,9 +54,12 @@ python -m cicd_guard.scan samples/workflows/insecure-workflow.yml
 - Third-party action pinning
 - Secret hygiene
 - Build pipeline integrity
-- Secure artifact handling
+- Pull-request trust-boundary enforcement
+- Expression-injection prevention
 - Automated policy checks
+
+See [`docs/security-model.md`](docs/security-model.md) for the threat model and severity rationale.
 
 ## Portfolio talking points
 
-This project demonstrates how I would secure CI/CD pipelines by converting software supply-chain risks into automated checks that can run in pull requests and prevent insecure workflow drift.
+This project demonstrates how I would secure CI/CD pipelines by converting software supply-chain risks and GitHub Actions trust boundaries into deterministic checks that can run in pull requests and prevent insecure workflow drift.
