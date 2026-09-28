@@ -33,9 +33,40 @@ def _scan_permissions(workflow: dict[str, Any]) -> list[dict[str, str]]:
     return []
 
 
+def _scan_job_permissions(job_name: str, permissions: Any) -> list[dict[str, str]]:
+    """Identify job-scoped GITHUB_TOKEN grants that override safer workflow defaults."""
+    if permissions == "write-all":
+        return [
+            _finding(
+                "high",
+                f"Job {job_name} grants write-all permissions",
+                "Replace write-all with only the write scopes required by this job and keep all other scopes read-only or disabled.",
+            )
+        ]
+    if not isinstance(permissions, dict):
+        return []
+
+    write_scopes = sorted(
+        str(scope) for scope, access in permissions.items() if str(access).lower() == "write"
+    )
+    if not write_scopes:
+        return []
+
+    return [
+        _finding(
+            "medium",
+            f"Job {job_name} grants write permissions: {', '.join(write_scopes)}",
+            "Verify each write scope is required for the job; prefer read-only workflow defaults and elevate only the minimum scopes at job level.",
+        )
+    ]
+
+
 def _scan_jobs(jobs: dict[str, Any]) -> list[dict[str, str]]:
     findings: list[dict[str, str]] = []
     for job_name, job in jobs.items():
+        if not isinstance(job, dict):
+            continue
+        findings.extend(_scan_job_permissions(str(job_name), job.get("permissions")))
         for step in job.get("steps", []):
             uses = step.get("uses")
             run = step.get("run", "")
