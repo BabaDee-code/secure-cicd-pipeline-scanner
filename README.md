@@ -7,12 +7,22 @@ A DevSecOps security scanner that reviews GitHub Actions workflows for excessive
 ## What this project shows
 
 - GitHub Actions workflow security review
-- Excessive permissions detection
+- Workflow- and job-level `GITHUB_TOKEN` permission analysis
 - Unpinned action detection
 - Secret-pattern detection in workflow files
 - Dangerous shell command pattern detection
 - Risk scoring and remediation recommendations
 - Unit tests and CI validation
+
+## Permission model
+
+GitHub Actions permissions can be declared for the entire workflow or overridden by an individual job. The scanner treats job-level grants as a separate trust boundary because a workflow with a read-only default can still elevate one job's `GITHUB_TOKEN`.
+
+- `permissions: write-all` is high severity at either workflow or job scope.
+- Explicit job scopes set to `write` are reported so reviewers can verify that each elevation is necessary.
+- Read-only job permissions and `permissions: {}` are accepted without a finding.
+
+The recommended pattern is a read-only workflow default with narrowly scoped job-level elevation only where the job genuinely needs to mutate repository resources, publish packages, or request an OIDC token.
 
 ## Repository structure
 
@@ -31,7 +41,7 @@ python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\\Scripts\\activate
 pip install -r requirements-dev.txt
 pytest -q
-python -m cicd_guard.scan samples/workflows/insecure-workflow.yml
+PYTHONPATH=src python -m cicd_guard.scan samples/workflows/insecure-workflow.yml
 ```
 
 ## Example finding
